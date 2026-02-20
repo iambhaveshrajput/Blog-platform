@@ -22,25 +22,29 @@ export const AuthProvider = ({ children }) => {
   });
 
   // loading is false immediately - no API call blocks it
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     refreshAuthInBackground();
   }, []);
 
-  const refreshAuthInBackground = () => {
+  const refreshAuthInBackground = async () => {
     const token = localStorage.getItem('accessToken');
-    if (!token) return;
+    if (!token) 
+      setLoading(false);
+      return;
 
     try {
       const decoded = jwtDecode(token);
       const currentTime = Date.now() / 1000;
       if (decoded.exp <= currentTime) {
         clearAuth();
+        setLoading(false);
         return;
       }
     } catch (e) {
       clearAuth();
+      setLoading(false);
       return;
     }
 
@@ -51,11 +55,14 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('userData', JSON.stringify(response.data));
       })
       .catch(error => {
-        console.log('Background profile refresh failed, keeping user logged in');
-        
+        if (error.response?.status === 401) {
+         clearAuth();  // ← ONLY clear on real auth failure
         }
         // Network/timeout errors = keep user logged in, do nothing
       });
+      .finally(() => {
+        setLoading(false);
+      }
   };
 
   const clearAuth = () => {
