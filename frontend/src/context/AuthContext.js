@@ -21,26 +21,37 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAuth = async () => {
-    const token = localStorage.getItem('accessToken');
-    
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        const currentTime = Date.now() / 1000;
-        
-        if (decoded.exp > currentTime) {
+  const token = localStorage.getItem('accessToken');
+  
+  if (token) {
+    try {
+      const decoded = jwtDecode(token);
+      const currentTime = Date.now() / 1000;
+      
+      if (decoded.exp > currentTime) {
+        try {
           const response = await authAPI.getProfile();
           setUser(response.data);
-        } else {
-          logout();
+        } catch (error) {
+          // If it's a network error (server sleeping), keep user logged in
+          // Only logout on 401 (actually unauthorized)
+          if (error.response && error.response.status === 401) {
+            logout();
+          } else {
+            // Network error - restore user from token data so page doesn't go blank
+            setUser({ username: decoded.username || decoded.user_id });
+          }
         }
-      } catch (error) {
+      } else {
         logout();
       }
+    } catch (error) {
+      logout();
     }
-    
-    setLoading(false);
-  };
+  }
+  
+  setLoading(false);
+};
 
   const login = async (credentials) => {
     const response = await authAPI.login(credentials);
