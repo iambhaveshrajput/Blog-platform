@@ -14,59 +14,48 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    // Instantly load user from localStorage on first render
-    // This prevents blank page on refresh
     const saved = localStorage.getItem('userData');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { return null; }
     }
     return null;
   });
-  const [loading, setLoading] = useState(true);
+
+  // loading is false immediately - no API call blocks it
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    checkAuth();
+    refreshAuthInBackground();
   }, []);
 
-  const checkAuth = () => {
+  const refreshAuthInBackground = () => {
     const token = localStorage.getItem('accessToken');
-
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    if (!token) return;
 
     try {
       const decoded = jwtDecode(token);
       const currentTime = Date.now() / 1000;
-
       if (decoded.exp <= currentTime) {
-        // Token expired - clear everything
         clearAuth();
-        setLoading(false);
         return;
       }
-
-      // Token is still valid - user already restored from localStorage above
-      // Now fetch fresh profile in background WITHOUT blocking the page
-      authAPI.getProfile()
-        .then(response => {
-          setUser(response.data);
-          localStorage.setItem('userData', JSON.stringify(response.data));
-        })
-        .catch(error => {
-          if (error.response && error.response.status === 401) {
-            // Actually unauthorized - clear auth
-            clearAuth();
-          }
-          // Any other error (network, timeout, server sleeping) = keep user logged in
-        });
-
     } catch (e) {
       clearAuth();
+      return;
     }
 
-    setLoading(false);
+    // Token valid - silently refresh profile in background
+    authAPI.getProfile()
+      .then(response => {
+        setUser(response.data);
+        localStorage.setItem('userData', JSON.stringify(response.data));
+      })
+      .catch(error => {
+        if (error.response && error.response.status === 401) {
+          clearAuth();
+        }
+        // Network/timeout errors = keep user logged in, do nothing
+      });
   };
 
   const clearAuth = () => {
@@ -79,14 +68,12 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     const response = await authAPI.login(credentials);
     const { access, refresh } = response.data;
-
     localStorage.setItem('accessToken', access);
     localStorage.setItem('refreshToken', refresh);
 
     const profileResponse = await authAPI.getProfile();
     setUser(profileResponse.data);
     localStorage.setItem('userData', JSON.stringify(profileResponse.data));
-
     return profileResponse.data;
   };
 
