@@ -20,15 +20,37 @@ import './App.css';
 
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
-  
   if (loading) {
-    return <div className="text-center mt-5">Loading...</div>;
+    return (
+      <div className="text-center mt-5">
+        <div className="spinner-border text-primary" role="status" />
+      </div>
+    );
   }
-  
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
 function AppContent() {
+  const { loading } = useAuth();
+
+  // Show a minimal spinner while auth initializes
+  // Navigation is NOT rendered during this time to prevent crashes
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        background: '#f8f9fa'
+      }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Router>
       <div className="App">
@@ -40,56 +62,13 @@ function AppContent() {
           <Route path="/posts/:slug" element={<PostDetail />} />
           <Route path="/user/:username" element={<UserProfile />} />
           <Route path="/trending" element={<Trending />} />
-          
-          {/* Protected Routes */}
-          <Route
-            path="/create-post"
-            element={
-              <PrivateRoute>
-                <CreatePost />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/edit-post/:slug"
-            element={
-              <PrivateRoute>
-                <EditPost />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/my-posts"
-            element={
-              <PrivateRoute>
-                <MyPosts />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/bookmarks"
-            element={
-              <PrivateRoute>
-                <Bookmarks />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/edit-profile"
-            element={
-              <PrivateRoute>
-                <EditProfile />
-              </PrivateRoute>
-            }
-          />
+
+          <Route path="/create-post" element={<PrivateRoute><CreatePost /></PrivateRoute>} />
+          <Route path="/edit-post/:slug" element={<PrivateRoute><EditPost /></PrivateRoute>} />
+          <Route path="/my-posts" element={<PrivateRoute><MyPosts /></PrivateRoute>} />
+          <Route path="/bookmarks" element={<PrivateRoute><Bookmarks /></PrivateRoute>} />
+          <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+          <Route path="/edit-profile" element={<PrivateRoute><EditProfile /></PrivateRoute>} />
         </Routes>
       </div>
     </Router>
