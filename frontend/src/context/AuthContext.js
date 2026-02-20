@@ -51,8 +51,8 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('userData', JSON.stringify(response.data));
       })
       .catch(error => {
-        if (error.response && error.response.status === 401) {
-          clearAuth();
+        console.log('Background profile refresh failed, keeping user logged in');
+        
         }
         // Network/timeout errors = keep user logged in, do nothing
       });
