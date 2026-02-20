@@ -13,16 +13,23 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    // Instantly load user from localStorage on first render
+    // This prevents blank page on refresh
+    const saved = localStorage.getItem('userData');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return null; }
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     checkAuth();
   }, []);
 
-  const checkAuth = async () => {
+  const checkAuth = () => {
     const token = localStorage.getItem('accessToken');
-    const savedUser = localStorage.getItem('userData');
 
     if (!token) {
       setLoading(false);
@@ -40,27 +47,22 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      // Token is valid - immediately restore user from localStorage
-      // This prevents blank page on refresh
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
-      }
-
-      // Fetch fresh profile in background (don't block the page)
+      // Token is still valid - user already restored from localStorage above
+      // Now fetch fresh profile in background WITHOUT blocking the page
       authAPI.getProfile()
         .then(response => {
           setUser(response.data);
           localStorage.setItem('userData', JSON.stringify(response.data));
         })
         .catch(error => {
-          // 401 = actually logged out
           if (error.response && error.response.status === 401) {
+            // Actually unauthorized - clear auth
             clearAuth();
           }
-          // Network error / server sleeping = keep existing user, don't logout
+          // Any other error (network, timeout, server sleeping) = keep user logged in
         });
 
-    } catch (error) {
+    } catch (e) {
       clearAuth();
     }
 
@@ -103,15 +105,17 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   };
 
-  const value = {
-    user,
-    loading,
-    login,
-    register,
-    logout,
-    updateUser,
-    isAuthenticated: !!user,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      login,
+      register,
+      logout,
+      updateUser,
+      isAuthenticated: !!user,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
