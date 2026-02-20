@@ -22,71 +22,55 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     const token = localStorage.getItem('accessToken');
+    const savedUser = localStorage.getItem('userData');
 
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        const currentTime = Date.now() / 1000;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
 
-        if (decoded.exp > currentTime) {
-          // Set a basic user immediately from token so page never goes blank
-          setUser({ id: decoded.user_id, username: decoded.username || '' });
+    try {
+      const decoded = jwtDecode(token);
+      const currentTime = Date.now() / 1000;
 
-          // Then try to get full profile in background
-          try {
-            const response = await authAPI.getProfile();
-            setUser(response.data);
-          } catch (error) {
-            if (error.response && error.response.status === 401) {
-              // Truly unauthorized - try refresh token first
-              const refreshed = await tryRefreshToken();
-              if (!refreshed) {
-                clearAuth();
-              }
-            }
-            // For network errors (server sleeping), keep the user logged in
-            // The basic user from token is already set above
-          }
-        } else {
-          // Token expired - try refresh
-          const refreshed = await tryRefreshToken();
-          if (!refreshed) {
+      if (decoded.exp <= currentTime) {
+        // Token expired - clear everything
+        clearAuth();
+        setLoading(false);
+        return;
+      }
+
+      // Token is valid - immediately restore user from localStorage
+      // This prevents blank page on refresh
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
+
+      // Fetch fresh profile in background (don't block the page)
+      authAPI.getProfile()
+        .then(response => {
+          setUser(response.data);
+          localStorage.setItem('userData', JSON.stringify(response.data));
+        })
+        .catch(error => {
+          // 401 = actually logged out
+          if (error.response && error.response.status === 401) {
             clearAuth();
           }
-        }
-      } catch (error) {
-        clearAuth();
-      }
+          // Network error / server sleeping = keep existing user, don't logout
+        });
+
+    } catch (error) {
+      clearAuth();
     }
 
     setLoading(false);
   };
 
-  const tryRefreshToken = async () => {
-    try {
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (!refreshToken) return false;
-
-      const { default: axios } = await import('axios');
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
-      const response = await axios.post(`${API_URL}/token/refresh/`, {
-        refresh: refreshToken,
-      });
-
-      const { access } = response.data;
-      localStorage.setItem('accessToken', access);
-
-      const profileResponse = await authAPI.getProfile();
-      setUser(profileResponse.data);
-      return true;
-    } catch (error) {
-      return false;
-    }
-  };
-
   const clearAuth = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userData');
     setUser(null);
   };
 
@@ -99,6 +83,7 @@ export const AuthProvider = ({ children }) => {
 
     const profileResponse = await authAPI.getProfile();
     setUser(profileResponse.data);
+    localStorage.setItem('userData', JSON.stringify(profileResponse.data));
 
     return profileResponse.data;
   };
@@ -114,6 +99,7 @@ export const AuthProvider = ({ children }) => {
   const updateUser = async (data) => {
     const response = await authAPI.updateProfile(data);
     setUser(response.data);
+    localStorage.setItem('userData', JSON.stringify(response.data));
     return response.data;
   };
 
