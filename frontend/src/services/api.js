@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Your Render backend URL — replace if yours is different
-const BACKEND_URL = process.env.REACT_APP_API_URL || 'https://blog-backend.onrender.com/api';
+const BACKEND_URL = process.env.REACT_APP_API_URL || 'https://blog-backend-9kro.onrender.com/api';
 
 const api = axios.create({
   baseURL: BACKEND_URL,
